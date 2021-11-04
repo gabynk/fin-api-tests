@@ -3,6 +3,7 @@ import { InMemoryUsersRepository } from "../../../users/repositories/in-memory/I
 import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase";
 import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository";
 import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase";
+import { CreateTransferUseCase } from "../createTransfer/CreateTransferUseCase";
 import { GetStatementOperationError } from "./GetStatementOperationError";
 import { GetStatementOperationUseCase } from "./GetStatementOperationUseCase";
 
@@ -11,6 +12,7 @@ let inMemoryUsersRepository: InMemoryUsersRepository;
 let getStatementOperationUseCase: GetStatementOperationUseCase;
 let createStatementUseCase: CreateStatementUseCase;
 let createUserUseCase: CreateUserUseCase;
+let createTransferUseCase: CreateTransferUseCase;
 
 enum OperationType {
   DEPOSIT = 'deposit',
@@ -24,6 +26,7 @@ describe("Get Statement Operation", () => {
     getStatementOperationUseCase = new GetStatementOperationUseCase(inMemoryUsersRepository, inMemoryStatementsRepository);
     createStatementUseCase = new CreateStatementUseCase(inMemoryUsersRepository, inMemoryStatementsRepository);
     createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
+    createTransferUseCase = new CreateTransferUseCase(inMemoryUsersRepository, inMemoryStatementsRepository);
   })
 
   it("should be able to show statement operation", async () => {
@@ -46,6 +49,41 @@ describe("Get Statement Operation", () => {
     })
 
     expect(statementOperation).toEqual(createdStatement)
+  })
+
+  it("should be able to show transfer statement operation", async () => {
+    const senderUser = await createUserUseCase.execute({
+      name: "Test statement",
+      email: "sender@test.com",
+      password: "1234"
+    });
+
+    const receiverUser = await createUserUseCase.execute({
+      name: "Test statement",
+      email: "receiver@test.com",
+      password: "1234"
+    });
+
+    await createStatementUseCase.execute({
+      user_id: senderUser?.id as string,
+      type: OperationType.DEPOSIT,
+      amount: 500,
+      description: 'deposit value'
+    })
+
+    const transferData = await createTransferUseCase.execute({
+      user_id: senderUser?.id as string,
+      sender_id: receiverUser?.id as string,
+      amount: 200,
+      description: 'transfer value'
+    })
+
+    const statementOperation = await getStatementOperationUseCase.execute({
+      user_id: senderUser?.id as string,
+      statement_id: transferData?.id as string
+    })
+
+    expect(statementOperation).toHaveProperty("sender_id")
   })
 
   it("should not be able to show balance with nonexistent user", async () => {

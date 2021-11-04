@@ -3,6 +3,7 @@ import { InMemoryUsersRepository } from "../../../users/repositories/in-memory/I
 import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase";
 import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository";
 import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase";
+import { CreateTransferUseCase } from "../createTransfer/CreateTransferUseCase";
 import { GetBalanceError } from "./GetBalanceError";
 import { GetBalanceUseCase } from "./GetBalanceUseCase";
 
@@ -11,6 +12,7 @@ let inMemoryUsersRepository: InMemoryUsersRepository;
 let getBalanceUseCase: GetBalanceUseCase;
 let createStatementUseCase: CreateStatementUseCase;
 let createUserUseCase: CreateUserUseCase;
+let createTransferUseCase: CreateTransferUseCase;
 
 enum OperationType {
   DEPOSIT = 'deposit',
@@ -24,6 +26,7 @@ describe("Get Balance Statement", () => {
     getBalanceUseCase = new GetBalanceUseCase(inMemoryStatementsRepository, inMemoryUsersRepository);
     createStatementUseCase = new CreateStatementUseCase(inMemoryUsersRepository, inMemoryStatementsRepository);
     createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
+    createTransferUseCase = new CreateTransferUseCase(inMemoryUsersRepository, inMemoryStatementsRepository);
   })
 
   it("should be able to show balance", async () => {
@@ -46,6 +49,76 @@ describe("Get Balance Statement", () => {
 
     expect(balance).toHaveProperty("balance")
     expect(balance).toHaveProperty("statement")
+  })
+
+  it("should be able to show balance if create transfer operation to sender user", async () => {
+    const senderUser = await createUserUseCase.execute({
+      name: "Test statement",
+      email: "sender@test.com",
+      password: "1234"
+    });
+
+    const receiverUser = await createUserUseCase.execute({
+      name: "Test statement",
+      email: "receiver@test.com",
+      password: "1234"
+    });
+
+    await createStatementUseCase.execute({
+      user_id: senderUser?.id as string,
+      type: OperationType.DEPOSIT,
+      amount: 500,
+      description: 'deposit value'
+    })
+
+    await createTransferUseCase.execute({
+      user_id: senderUser?.id as string,
+      sender_id: receiverUser?.id as string,
+      amount: 200,
+      description: 'transfer value'
+    })
+
+    const balance = await getBalanceUseCase.execute({
+      user_id: senderUser?.id as string
+    })
+
+    expect(balance).toHaveProperty("balance")
+    expect(balance.balance).toEqual(300)
+  })
+
+  it("should be able to show balance if create transfer operation to receiver user", async () => {
+    const senderUser = await createUserUseCase.execute({
+      name: "Test statement",
+      email: "sender@test.com",
+      password: "1234"
+    });
+
+    const receiverUser = await createUserUseCase.execute({
+      name: "Test statement",
+      email: "receiver@test.com",
+      password: "1234"
+    });
+
+    await createStatementUseCase.execute({
+      user_id: senderUser?.id as string,
+      type: OperationType.DEPOSIT,
+      amount: 500,
+      description: 'deposit value'
+    })
+
+    await createTransferUseCase.execute({
+      user_id: senderUser?.id as string,
+      sender_id: receiverUser?.id as string,
+      amount: 200,
+      description: 'transfer value'
+    })
+
+    const balance = await getBalanceUseCase.execute({
+      user_id: receiverUser?.id as string
+    })
+
+    expect(balance).toHaveProperty("balance")
+    expect(balance.balance).toEqual(200)
   })
 
   it("should not be able to show balance with nonexistent user", async () => {
